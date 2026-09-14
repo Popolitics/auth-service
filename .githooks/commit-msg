@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+#
+# commit-msg — refuse un message de commit hors spécification Conventional Commits
+# (aligné sur documentation/CONTRIBUTING.md)
+#
+# Format : <type>(<scope>): <sujet>
+#   ex. feat(auth): PROJ-123 add JWT validation logic
+#
+# Contourner (à éviter) : git commit --no-verify
+#
+set -euo pipefail
+
+msg_file="$1"
+header="$(head -n1 "$msg_file")"
+
+pattern='^(feat|fix|docs|style|refactor|perf|test|chore|build|ci|revert)(\([a-z0-9][a-z0-9/_ -]*[a-z0-9]\)|\([a-z0-9]\))?!?: .+'
+
+if [[ ! "$header" =~ $pattern ]]; then
+  cat <<EOF
+ Message de commit non conforme :
+   "$header"
+
+Format attendu : <type>(<scope>): <sujet>
+  type ∈ feat | fix | docs | style | refactor | perf | test | chore | build | ci | revert
+  ex. feat(auth): PROJ-123 add JWT validation logic
+      fix(ui): PROJ-456 resolve modal z-index
+      docs: update installation steps
+      revert: PROJ-789 restore previous authentication flow
+EOF
+  exit 1
+fi
+
+exit 0
