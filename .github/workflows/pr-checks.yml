@@ -1,0 +1,69 @@
+# À copier dans chaque repo sous : .github/workflows/pr-checks.yml
+#
+# Vérifie, sur chaque Pull Request vers main/develop :
+#   1. le nom de la branche source (convention POPolitics)
+#   2. les messages de tous les commits de la PR (Conventional Commits)
+#
+# Filet de sécurité derrière les hooks locaux : une PR non conforme devient
+# ROUGE et n'est donc pas mergée (couplé à la règle "2 reviews" du CONTRIBUTING).
+# Aucune dépendance : fonctionne pour les repos Node (frontend) et Python (backends).
+
+name: pr-checks
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+# Le workflow ne lit que le dépôt ; éviter d'hériter de permissions d'écriture.
+permissions:
+  contents: read
+
+jobs:
+  branch-name:
+    name: ci / branch-name
+    runs-on: ubuntu-latest
+    steps:
+      - name: Vérifier le nom de la branche
+        env:
+          # indirection par env-var : la valeur n'est PAS ré-évaluée par le shell
+          # (évite l'injection via un nom de branche malveillant)
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          pattern='^(feat|fix|docs|style|refactor|perf|test|chore|build|ci|revert)/[A-Z]{2,}-[0-9]+-[a-z0-9]+(-[a-z0-9]+)*$'
+          echo "Branche : $BRANCH"
+          if [[ ! "$BRANCH" =~ $pattern ]]; then
+            echo "::error::Nom de branche non conforme : '$BRANCH'"
+            echo "Format attendu : category/TICKET-123-short-description (feat|fix|docs|style|refactor|perf|test|chore|build|ci|revert)"
+            exit 1
+          fi
+          echo "✅ Nom de branche conforme"
+
+  commit-messages:
+    name: ci / commit-messages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Vérifier les messages de commit
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          git fetch --quiet origin "$BASE_REF"
+          base="origin/$BASE_REF"
+          pattern='^(feat|fix|docs|style|refactor|perf|test|chore|build|ci|revert)(\([a-z0-9][a-z0-9/_ -]*[a-z0-9]\)|\([a-z0-9]\))?!?: .+'
+          fail=0
+          # premier ligne de chaque commit de la PR (exclut les commits de merge)
+          while read -r sha; do
+            header="$(git log -1 --format=%s "$sha")"
+            if [[ ! "$header" =~ $pattern ]]; then
+              echo "::error::Commit non conforme ($sha) : $header"
+              fail=1
+            else
+              echo "✅ $header"
+            fi
+          done < <(git rev-list --no-merges "$base"..HEAD)
+          if [ "$fail" -ne 0 ]; then
+            echo "Format attendu : <type>(<scope>): <sujet>  (Conventional Commits)"
+            exit 1
+          fi

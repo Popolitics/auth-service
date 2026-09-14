@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# uv / venv
+.venv/
+
+# Django
+db.sqlite3
+staticfiles/
+media/
+
+# env
+.env
+
+# tool-specific (not shared across the team)
+CLAUDE.md

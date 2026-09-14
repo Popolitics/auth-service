@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+#
+# pre-push — refuse de pousser une branche dont le nom ne respecte pas la
+# convention POPolitics : category/TICKET-123-short-description
+#
+# Contourner (à éviter) : git push --no-verify
+#
+set -euo pipefail
+
+pattern='^(feat|fix|docs|refactor|chore|perf|test)/[A-Z]{2,}-[0-9]+-[a-z0-9]+(-[a-z0-9]+)*$'
+protected='^(main|develop)$'
+
+fail=0
+
+# stdin fournit : <local ref> <local sha> <remote ref> <remote sha>
+while read -r local_ref local_sha remote_ref remote_sha; do
+  # ignore les suppressions de branche (local_sha = 000...0)
+  [ "$local_sha" = "0000000000000000000000000000000000000000" ] && continue
+
+  branch="${local_ref#refs/heads/}"
+
+  # les branches longue durée sont autorisées telles quelles
+  if [[ "$branch" =~ $protected ]]; then
+    continue
+  fi
+
+  if [[ ! "$branch" =~ $pattern ]]; then
+    echo " Nom de branche non conforme : '$branch'"
+    fail=1
+  fi
+done
+
+if [ "$fail" -ne 0 ]; then
+  cat <<'EOF'
+
+Format attendu : category/TICKET-123-short-description
+  category ∈ feat | fix | docs | refactor | chore | perf | test
+  ex. feat/PROJ-123-user-authentication
+
+Renomme ta branche :  git branch -m <nouveau-nom>
+EOF
+  exit 1
+fi
+
+exit 0
