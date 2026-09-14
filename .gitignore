@@ -13,6 +13,7 @@ media/
 
 # env
 .env
+*.pem
 
 # tool-specific (not shared across the team)
 CLAUDE.md
