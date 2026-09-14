@@ -146,13 +146,16 @@ REST_FRAMEWORK = {
 # Simple JWT
 # https://django-rest-framework-simplejwt.readthedocs.io/en/latest/settings.html
 #
-# SIGNING_KEY est partagée avec data-service (et tout autre service qui doit
-# vérifier nos tokens) via la variable d'env JWT_SIGNING_KEY — volontairement
-# distincte de DJANGO_SECRET_KEY, qui reste propre à chaque service
-# (sessions/CSRF) et ne doit jamais être partagée entre services.
+# RS256 (asymétrique) : seul auth-service détient JWT_PRIVATE_KEY et peut donc
+# signer des tokens. Les autres services (ex. data-service) ne reçoivent que
+# JWT_PUBLIC_KEY pour VÉRIFIER — jamais la clé privée. Ainsi, la compromission
+# d'un service consommateur ne permet pas de forger des tokens.
+# Ne jamais revenir à une clé symétrique (HS256) partagée entre services.
 
 SIMPLE_JWT = {
-    'SIGNING_KEY': env('JWT_SIGNING_KEY'),
+    'ALGORITHM': 'RS256',
+    'SIGNING_KEY': env('JWT_PRIVATE_KEY').replace('\\n', '\n'),
+    'VERIFYING_KEY': env('JWT_PUBLIC_KEY').replace('\\n', '\n'),
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
