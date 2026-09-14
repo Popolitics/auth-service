@@ -21,3 +21,20 @@ uv run python manage.py runserver
 | `/api/health/` | GET | Healthcheck |
 | `/api/token/` | POST | Login → `{access, refresh}` |
 | `/api/token/refresh/` | POST | Renouvelle un `access` à partir d'un `refresh` |
+
+## JWT en RS256 (clé privée/publique)
+
+Seul `auth-service` signe des tokens (clé privée). Tout autre service qui doit
+les vérifier (ex. `data-service`) ne reçoit **que** la clé publique — jamais
+la clé privée. Génération d'une paire pour un environnement :
+
+```bash
+openssl genrsa -out private.pem 2048
+openssl rsa -in private.pem -pubout -out public.pem
+```
+
+Coller le contenu de chaque fichier dans `.env`, avec des `\n` littéraux à la
+place des retours à la ligne (voir `.env.example`). Distribuer `public.pem`
+aux services consommateurs, garder `private.pem` uniquement ici. En cas de
+compromission d'un service consommateur, seule la clé publique fuite —
+aucun risque de forger de nouveaux tokens.
