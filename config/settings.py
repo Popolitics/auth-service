@@ -145,8 +145,14 @@ REST_FRAMEWORK = {
 
 # Simple JWT
 # https://django-rest-framework-simplejwt.readthedocs.io/en/latest/settings.html
+#
+# SIGNING_KEY est partagée avec data-service (et tout autre service qui doit
+# vérifier nos tokens) via la variable d'env JWT_SIGNING_KEY — volontairement
+# distincte de DJANGO_SECRET_KEY, qui reste propre à chaque service
+# (sessions/CSRF) et ne doit jamais être partagée entre services.
 
 SIMPLE_JWT = {
+    'SIGNING_KEY': env('JWT_SIGNING_KEY'),
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
