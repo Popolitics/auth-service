@@ -4,9 +4,14 @@ version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.13"
 dependencies = [
+    "argon2-cffi>=25.1.0",
     "cryptography>=50.0.1",
     "django>=6.1.1",
     "django-environ>=0.14.0",
     "djangorestframework>=3.18.1",
     "djangorestframework-simplejwt>=5.5.1",
+    "drf-spectacular>=0.30.0",
+    "gunicorn>=26.2.0",
+    "psycopg2-binary>=2.9.13",
+    "whitenoise>=6.12.0",
 ]

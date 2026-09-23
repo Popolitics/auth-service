@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  # Base de données PostgreSQL dédiée
+  db:
+    image: postgres:16-alpine
+    container_name: auth_postgres_db
+    restart: always
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: auth_user
+      POSTGRES_PASSWORD: popolitics
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auth_user -d auth_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Microservice d'authentification Django
+  auth-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: auth_service
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - DJANGO_SECRET_KEY=votre_secret_key_de_dev_12345
+      - DEBUG=True
+      - DB_NAME=auth_db
+      - DB_USER=auth_user
+      - DB_PASSWORD=popolitics
+      - DB_HOST=db
+      - DB_PORT=5432
+      - JWT_PRIVATE_KEY=${JWT_PRIVATE_KEY}
+      - JWT_PUBLIC_KEY=${JWT_PUBLIC_KEY}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/.venv
+
+volumes:
+  postgres_data:

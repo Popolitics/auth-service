@@ -1,0 +1,64 @@
+name: Build, Push to GHCR and Update GitOps
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - 'feat/**'
+    paths:
+      - 'src/**'
+      - 'Dockerfile'
+      - 'requirements.txt'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Connexion à GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configuration de Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Build & Push avec le SHA unique du commit
+      - name: Build et Push de l'image sur GHCR
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/auth-service:${{ github.sha }}
+
+      # Mise à jour du fichier kustomization.yaml local
+      - name: Mise à jour du tag dans Kustomize
+        run: |
+          cd k8s/apps/auth-service
+          kustomize edit set image auth-service=ghcr.io/${{ github.repository_owner }}/auth-service:${{ github.sha }}
+
+      # Commit et Push sur la branche exacte qui a déclenché le workflow
+      - name: Commit et Push vers Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add k8s/apps/auth-service/kustomization.yaml
+          
+          # On vérifie s'il y a une modification avant de commiter pour éviter les erreurs
+          if ! git diff --staged --quiet; then
+            git commit -m "ci(deploy): update image tag to ${{ github.sha }} [skip ci]"
+            git push origin HEAD:${{ github.ref_name }}
+          else
+            echo "Aucune modification détectée dans Kustomize."
+          fi
