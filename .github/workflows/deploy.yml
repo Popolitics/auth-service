@@ -4,10 +4,12 @@ on:
   push:
     branches:
       - main
+      - 'feat/**'     # Déclenche pour feat/login, feat/auth-db, etc.
+      - 'feat-*'      # Déclenche aussi si vous nommez feat-login, feat-auth, etc.
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: authServicePopolitics
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build-and-push:
@@ -27,9 +29,19 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
