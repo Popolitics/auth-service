@@ -2,7 +2,11 @@ from unittest.mock import patch
 
 from django.contrib.auth import authenticate, get_user_model
 from django.db import IntegrityError, transaction
+from django.urls import reverse
 from rest_framework.test import APITestCase
+from rest_framework_simplejwt.backends import TokenBackend
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 User = get_user_model()
 
@@ -82,3 +86,54 @@ class RegistrationTests(APITestCase):
         self.assertTrue(user.is_staff)
         self.assertTrue(user.is_superuser)
         self.assertEqual(user.email, 'admin@example.org')
+
+
+class TokenEndpointTests(APITestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        cls.backend = TokenBackend(
+            algorithm='RS256',
+            signing_key=key.private_bytes(serialization.Encoding.PEM,
+                                         serialization.PrivateFormat.PKCS8,
+                                         serialization.NoEncryption()).decode(),
+            verifying_key=key.public_key().public_bytes(
+                serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode(),
+        )
+
+    def setUp(self):
+        patcher = patch('rest_framework_simplejwt.tokens.Token.get_token_backend', return_value=self.backend)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.user = User.objects.create_user(email='marie@example.org', password='Secure!Password739')
+
+    def login(self):
+        return self.client.post(reverse('token_obtain_pair'), {
+            'email': 'MARIE@example.org', 'password': 'Secure!Password739',
+        }, format='json')
+
+    def test_login_returns_custom_claims(self):
+        response = self.login()
+        self.assertEqual(response.status_code, 200)
+        for name in ['access', 'refresh']:
+            claims = self.backend.decode(response.data[name])
+            self.assertEqual(claims['email'], self.user.email)
+            self.assertIsNone(claims['username'])
+            self.assertFalse(claims['is_staff'])
+            self.assertEqual(claims['user_id'], str(self.user.pk))
+
+    def test_refresh_and_verify_remain_available(self):
+        tokens = self.login().data
+        response = self.client.post(reverse('token_refresh'), {'refresh': tokens['refresh']}, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.backend.decode(response.data['access'])['email'], self.user.email)
+        response = self.client.post(reverse('token_verify'), {'token': response.data['access']}, format='json')
+        self.assertEqual(response.status_code, 200)
+
+    def test_invalid_credentials(self):
+        response = self.client.post(reverse('token_obtain_pair'), {
+            'email': self.user.email, 'password': 'incorrect',
+        }, format='json')
+        self.assertEqual(response.status_code, 401)
+        self.assertIn('detail', response.data)
