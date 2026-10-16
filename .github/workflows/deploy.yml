@@ -1,4 +1,4 @@
-name: Build, Push to GHCR and Update GitOps
+name: Build and Push to GHCR
 
 on:
   push:
@@ -7,15 +7,26 @@ on:
       - dev
       - 'feat/**'
     paths:
-      - 'src/**'
+      - 'accounts/**'
+      - 'config/**'
+      - 'manage.py'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.python-version'
       - 'Dockerfile'
-      - 'requirements.txt'
+      - '.dockerignore'
+      - 'docker-entrypoint.sh'
+      - '.github/workflows/deploy.yml'
+  pull_request:
+
+permissions:
+  contents: read
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
       packages: write
 
     steps:
@@ -23,6 +34,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Connexion à GHCR
+        if: github.event_name == 'push'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -32,33 +44,15 @@ jobs:
       - name: Configuration de Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Build & Push avec le SHA unique du commit
-      - name: Build et Push de l'image sur GHCR
+      - name: Préparer le nom de l'image
+        id: image
+        shell: bash
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Build de l'image et publication sur les push
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: true
+          push: ${{ github.event_name == 'push' }}
           tags: |
-            ghcr.io/${{ github.repository_owner }}/auth-service:${{ github.sha }}
-
-      # Mise à jour du fichier kustomization.yaml local
-      - name: Mise à jour du tag dans Kustomize
-        run: |
-          cd k8s/apps/auth-service
-          kustomize edit set image auth-service=ghcr.io/${{ github.repository_owner }}/auth-service:${{ github.sha }}
-
-      # Commit et Push sur la branche exacte qui a déclenché le workflow
-      - name: Commit et Push vers Git
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          
-          git add k8s/apps/auth-service/kustomization.yaml
-          
-          # On vérifie s'il y a une modification avant de commiter pour éviter les erreurs
-          if ! git diff --staged --quiet; then
-            git commit -m "ci(deploy): update image tag to ${{ github.sha }} [skip ci]"
-            git push origin HEAD:${{ github.ref_name }}
-          else
-            echo "Aucune modification détectée dans Kustomize."
-          fi
+            ${{ steps.image.outputs.name }}:${{ github.sha }}
