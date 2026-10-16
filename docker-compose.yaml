@@ -9,7 +9,7 @@ services:
     environment:
       POSTGRES_DB: auth_db
       POSTGRES_USER: auth_user
-      POSTGRES_PASSWORD: popolitics
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
     ports:
       - "5432:5432"
     volumes:
@@ -30,11 +30,12 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DJANGO_SECRET_KEY=votre_secret_key_de_dev_12345
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY must be set in .env}
       - DEBUG=True
       - DB_NAME=auth_db
       - DB_USER=auth_user
-      - DB_PASSWORD=popolitics
+      - DB_PASSWORD=${DB_PASSWORD:?DB_PASSWORD must be set in .env}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1}
       - DB_HOST=db
       - DB_PORT=5432
       - JWT_PRIVATE_KEY=${JWT_PRIVATE_KEY}
