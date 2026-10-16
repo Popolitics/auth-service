@@ -25,8 +25,11 @@ Vérifier avant la PR qu'aucune migration ne manque avec
 | Route | Méthode | Rôle |
 |---|---|---|
 | `/api/health/` | GET | Healthcheck |
+| `/api/auth/register/` | POST | Création de compte |
 | `/api/token/` | POST | Login → `{access, refresh}` |
 | `/api/token/refresh/` | POST | Renouvelle un `access` à partir d'un `refresh` |
+
+L'inscription demande un email et un mot de passe ; `username` est facultatif.
 
 ## JWT en RS256 (clé privée/publique)
 
