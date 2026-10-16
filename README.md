@@ -14,13 +14,30 @@ uv run python manage.py migrate
 uv run python manage.py runserver
 ```
 
+Les migrations sont conservées dans Git et appliquées au démarrage du conteneur.
+Après une modification des modèles, générer la migration avec
+`uv run python manage.py makemigrations`, puis ajouter le fichier généré au commit.
+Vérifier avant la PR qu'aucune migration ne manque avec
+`uv run python manage.py makemigrations --check --dry-run`.
+
+## Tests
+
+Avec PostgreSQL configuré dans `.env` : `uv run coverage run manage.py test --noinput`,
+puis `uv run coverage report` et `uv run coverage xml`.
+La CI exécute les migrations et les tests sur PostgreSQL 16, puis transmet la couverture à SonarCloud.
+
 ## Routes
 
 | Route | Méthode | Rôle |
 |---|---|---|
 | `/api/health/` | GET | Healthcheck |
-| `/api/token/` | POST | Login → `{access, refresh}` |
+| `/api/register/` | POST | Création de compte |
+| `/api/login/` | POST | Login → `{access, refresh}` |
+| `/api/logout/` | POST | Révoque le refresh token fourni dans `{"refresh": "…"}` ; access token Bearer requis |
 | `/api/token/refresh/` | POST | Renouvelle un `access` à partir d'un `refresh` |
+
+L'inscription demande un email et un mot de passe ; `username` est facultatif.
+Après logout (`204`), supprimer les tokens côté client ; l'access token reste valide jusqu'à expiration (15 minutes maximum).
 
 ## JWT en RS256 (clé privée/publique)
 
