@@ -8,6 +8,7 @@ on:
       - 'feat/**'
     paths:
       - 'accounts/**'
+      - 'authentication/**'
       - 'config/**'
       - 'manage.py'
       - 'pyproject.toml'

@@ -70,7 +70,7 @@ class RegistrationTests(APITestCase):
 
     def test_concurrent_email_conflict_returns_validation_error(self):
         self.register()
-        with patch('accounts.serializers.RegisterSerializer.validate_email', return_value='marie@example.org'):
+        with patch('authentication.serializers.RegisterSerializer.validate_email', return_value='marie@example.org'):
             response = self.register(email='MARIE@example.org')
         self.assertEqual(response.status_code, 400)
         self.assertIn('email', response.data)
