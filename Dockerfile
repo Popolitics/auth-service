@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.13-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -18,10 +18,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # Copie des dépendances
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml uv.lock .python-version ./
 
 # Création et installation dans le venv du conteneur
-RUN uv sync --frozen --no-cache
+RUN uv sync --frozen --no-cache --no-dev
 
 # Copie du code source
 COPY . .

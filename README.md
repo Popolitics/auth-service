@@ -20,6 +20,12 @@ Après une modification des modèles, générer la migration avec
 Vérifier avant la PR qu'aucune migration ne manque avec
 `uv run python manage.py makemigrations --check --dry-run`.
 
+## Tests
+
+Avec PostgreSQL configuré dans `.env` : `uv run coverage run manage.py test --noinput`,
+puis `uv run coverage report` et `uv run coverage xml`.
+La CI exécute les migrations et les tests sur PostgreSQL 16, puis transmet la couverture à SonarCloud.
+
 ## Routes
 
 | Route | Méthode | Rôle |
