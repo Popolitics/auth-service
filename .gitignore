@@ -17,3 +17,6 @@ media/
 
 # tool-specific (not shared across the team)
 CLAUDE.md
+
+# idea
+.idea/
