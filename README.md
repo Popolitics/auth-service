@@ -27,9 +27,11 @@ Vérifier avant la PR qu'aucune migration ne manque avec
 | `/api/health/` | GET | Healthcheck |
 | `/api/register/` | POST | Création de compte |
 | `/api/login/` | POST | Login → `{access, refresh}` |
+| `/api/logout/` | POST | Révoque le refresh token fourni dans `{"refresh": "…"}` ; access token Bearer requis |
 | `/api/token/refresh/` | POST | Renouvelle un `access` à partir d'un `refresh` |
 
 L'inscription demande un email et un mot de passe ; `username` est facultatif.
+Après logout (`204`), supprimer les tokens côté client ; l'access token reste valide jusqu'à expiration (15 minutes maximum).
 
 ## JWT en RS256 (clé privée/publique)
 

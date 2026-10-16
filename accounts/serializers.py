@@ -4,8 +4,28 @@ from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.settings import api_settings
 
 User = get_user_model()
+
+
+class LogoutSerializer(serializers.Serializer):
+    refresh = serializers.CharField(write_only=True)
+
+    def validate_refresh(self, value):
+        try:
+            token = RefreshToken(value)
+        except TokenError as exc:
+            raise serializers.ValidationError('Refresh token invalide ou expiré.') from exc
+        user_id = getattr(self.context['request'].user, api_settings.USER_ID_FIELD)
+        if str(token.get(api_settings.USER_ID_CLAIM)) != str(user_id):
+            raise serializers.ValidationError('Ce token ne correspond pas au compte connecté.')
+        return token
+
+    def save(self, **kwargs):
+        self.validated_data['refresh'].blacklist()
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod

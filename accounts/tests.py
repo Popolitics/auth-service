@@ -5,6 +5,7 @@ from django.db import IntegrityError, transaction
 from django.urls import reverse
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.backends import TokenBackend
+from rest_framework_simplejwt.tokens import RefreshToken
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
@@ -137,3 +138,52 @@ class TokenEndpointTests(APITestCase):
         }, format='json')
         self.assertEqual(response.status_code, 401)
         self.assertIn('detail', response.data)
+
+    def test_logout_revokes_refresh_and_preserves_other_sessions(self):
+        tokens = self.login().data
+        other_session = self.login().data
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+        response = self.client.post(reverse('logout'), {'refresh': tokens['refresh']}, format='json')
+        self.assertEqual(response.status_code, 204)
+        self.client.credentials()
+        response = self.client.post(reverse('token_refresh'), {'refresh': tokens['refresh']}, format='json')
+        self.assertEqual(response.status_code, 401)
+        response = self.client.post(reverse('token_refresh'), {'refresh': other_session['refresh']}, format='json')
+        self.assertEqual(response.status_code, 200)
+        # Logout revokes only the refresh token, not the current access token.
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+        self.assertEqual(self.client.post(reverse('logout'), {}, format='json').status_code, 400)
+
+    def test_logout_requires_authentication(self):
+        tokens = self.login().data
+        response = self.client.post(reverse('logout'), {'refresh': tokens['refresh']}, format='json')
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(self.client.post(reverse('token_refresh'), {'refresh': tokens['refresh']}, format='json').status_code, 200)
+
+    def test_logout_rejects_another_users_token(self):
+        tokens = self.login().data
+        other_user = User.objects.create_user(email='other@example.org', password='Secure!Password739')
+        refresh = str(RefreshToken.for_user(other_user))
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+        response = self.client.post(reverse('logout'), {'refresh': refresh}, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.client.credentials()
+        self.assertEqual(self.client.post(reverse('token_refresh'), {'refresh': refresh}, format='json').status_code, 200)
+
+    def test_logout_rejects_missing_invalid_expired_and_access_tokens(self):
+        tokens = self.login().data
+        expired = RefreshToken(tokens['refresh'])
+        expired['exp'] = 1
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+        for payload in [{}, {'refresh': 'invalid'}, {'refresh': str(expired)}, {'refresh': tokens['access']}]:
+            with self.subTest(payload=payload):
+                response = self.client.post(reverse('logout'), payload, format='json')
+                self.assertEqual(response.status_code, 400)
+                self.assertIn('refresh', response.data)
+
+    def test_logout_rejects_already_revoked_token(self):
+        tokens = self.login().data
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+        payload = {'refresh': tokens['refresh']}
+        self.assertEqual(self.client.post(reverse('logout'), payload, format='json').status_code, 204)
+        self.assertEqual(self.client.post(reverse('logout'), payload, format='json').status_code, 400)
