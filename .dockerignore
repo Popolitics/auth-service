@@ -1,5 +1,9 @@
 .venv
 .git
+.env
+.env.*
+!.env.example
+.idea
 __pycache__
 *.pyc
 *.pyo
