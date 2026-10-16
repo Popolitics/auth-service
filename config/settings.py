@@ -171,6 +171,8 @@ REST_FRAMEWORK = {
 # Ne jamais revenir à une clé symétrique (HS256) partagée entre services.
 
 SIMPLE_JWT = {
+'TOKEN_REFRESH_SERIALIZER': 'authentication.serializers.ActiveUserTokenRefreshSerializer',
+'TOKEN_VERIFY_SERIALIZER': 'authentication.serializers.ActiveUserTokenVerifySerializer',
 # Durées de vie
 'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
 'REFRESH_TOKEN_LIFETIME': timedelta(days=7),

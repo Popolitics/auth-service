@@ -92,7 +92,7 @@ class RegistrationTests(APITestCase):
         self.assertEqual(user.email, 'admin@example.org')
 
 
-class TokenEndpointTests(APITestCase):
+class TokenTestCase(APITestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -117,6 +117,8 @@ class TokenEndpointTests(APITestCase):
             'email': 'MARIE@example.org', 'password': 'Secure!Password739',
         }, format='json')
 
+
+class TokenEndpointTests(TokenTestCase):
     def test_login_returns_custom_claims(self):
         response = self.login()
         self.assertEqual(response.status_code, 200)
