@@ -14,6 +14,12 @@ uv run python manage.py migrate
 uv run python manage.py runserver
 ```
 
+Les migrations sont conservées dans Git et appliquées au démarrage du conteneur.
+Après une modification des modèles, générer la migration avec
+`uv run python manage.py makemigrations`, puis ajouter le fichier généré au commit.
+Vérifier avant la PR qu'aucune migration ne manque avec
+`uv run python manage.py makemigrations --check --dry-run`.
+
 ## Routes
 
 | Route | Méthode | Rôle |

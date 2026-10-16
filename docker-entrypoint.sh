@@ -1,10 +1,7 @@
 #!/bin/sh
 set -e
 
-echo "==> Génération des migrations Django si nécessaires..."
-python manage.py makemigrations accounts --noinput
-
-echo "==> Attente et exécution des migrations Django..."
+echo "==> Exécution des migrations Django versionnées..."
 python manage.py migrate --noinput
 
 echo "==> Rassemblement des fichiers statiques (CSS/JS)..."
