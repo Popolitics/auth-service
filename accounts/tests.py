@@ -12,7 +12,7 @@ User = get_user_model()
 
 
 class RegistrationTests(APITestCase):
-    url = '/api/auth/register/'
+    url = '/api/register/'
     password = 'Secure!Password739'
 
     def register(self, **overrides):
