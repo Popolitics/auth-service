@@ -50,7 +50,10 @@ class RegistrationTests(APITestCase):
         self.assertFalse(User.objects.exists())
 
     def test_required_and_valid_fields(self):
-        for data in [{}, {'email': 'invalid', 'password': self.password}, {'email': 'marie@example.org'}]:
+        for data in [{}, {'email': 'invalid', 'password': self.password},
+                     {'email': 'marie@example.org'},
+                     {'email': 'marie@example.org', 'password': None},
+                     {'email': 'marie@example.org', 'password': ''}]:
             with self.subTest(data=data):
                 self.assertEqual(self.client.post(self.url, data, format='json').status_code, 400)
 
