@@ -38,14 +38,34 @@ services:
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1}
       - DB_HOST=db
       - DB_PORT=5432
-      - JWT_PRIVATE_KEY=${JWT_PRIVATE_KEY}
-      - JWT_PUBLIC_KEY=${JWT_PUBLIC_KEY}
+      - JWT_PRIVATE_KEY=${JWT_PRIVATE_KEY:-}
+      - JWT_PUBLIC_KEY=${JWT_PUBLIC_KEY:-}
+      # Chemins relatifs à /app, où le dossier du projet est monté.
+      - JWT_PRIVATE_KEY_FILE=${JWT_PRIVATE_KEY_FILE:-}
+      - JWT_PUBLIC_KEY_FILE=${JWT_PUBLIC_KEY_FILE:-}
+      # Emails capturés par Mailpit (http://localhost:8025), jamais envoyés réellement.
+      - EMAIL_HOST=mailpit
+      - EMAIL_PORT=1025
+      - EMAIL_USE_TLS=False
+      - PASSWORD_RESET_URL=${PASSWORD_RESET_URL:-http://localhost:3000/reset-password}
+      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL:-no-reply@localhost}
     depends_on:
       db:
         condition: service_healthy
+      mailpit:
+        condition: service_started
     volumes:
       - .:/app
       - /app/.venv
+
+  # Faux serveur SMTP de dev : interface web sur http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:v1.27
+    container_name: auth_mailpit
+    restart: always
+    ports:
+      - "1025:1025"
+      - "8025:8025"
 
 volumes:
   postgres_data:

@@ -144,8 +144,16 @@ STATIC_URL = 'static/'
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-PRIVATE_KEY = os.getenv("JWT_PRIVATE_KEY", "").replace("\\n", "\n")
-PUBLIC_KEY = os.getenv("JWT_PUBLIC_KEY", "").replace("\\n", "\n")
+def read_key(name):
+    # NAME_FILE points to a PEM file (relative to BASE_DIR); otherwise NAME holds the key with literal \n.
+    path = os.getenv(f"{name}_FILE")
+    if path:
+        return (BASE_DIR / path).read_text()
+    return os.getenv(name, "").replace("\\n", "\n")
+
+
+PRIVATE_KEY = read_key("JWT_PRIVATE_KEY")
+PUBLIC_KEY = read_key("JWT_PUBLIC_KEY")
 
 # Django REST Framework
 # https://www.django-rest-framework.org/api-guide/settings/
@@ -217,11 +225,34 @@ PASSWORD_HASHERS = [
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
 
-MAILERS = {
-    'default': {
-        'BACKEND': 'django.core.mail.backends.console.EmailBackend',
-    },
-}
+# SMTP as soon as EMAIL_HOST is set (Mailpit in dev, Brevo or similar in prod),
+# otherwise emails are only printed to the console.
+if env('EMAIL_HOST', default=''):
+    MAILERS = {
+        'default': {
+            'BACKEND': 'django.core.mail.backends.smtp.EmailBackend',
+            'OPTIONS': {
+                'host': env('EMAIL_HOST'),
+                'port': env.int('EMAIL_PORT', default=587),
+                'username': env('EMAIL_HOST_USER', default=''),
+                'password': env('EMAIL_HOST_PASSWORD', default=''),
+                'use_tls': env.bool('EMAIL_USE_TLS', default=True),
+                'timeout': 10,
+            },
+        },
+    }
+else:
+    MAILERS = {
+        'default': {
+            'BACKEND': 'django.core.mail.backends.console.EmailBackend',
+        },
+    }
+DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='no-reply@localhost')
+
+# Password reset
+# Frontend page receiving ?uid=…&token=…, which then calls /api/password-reset/confirm/.
+PASSWORD_RESET_URL = env('PASSWORD_RESET_URL', default='http://localhost:3000/reset-password')
+PASSWORD_RESET_TIMEOUT = 60 * 60  # 1 heure
 
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STORAGES = {
