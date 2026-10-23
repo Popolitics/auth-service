@@ -25,7 +25,7 @@ dev = [
 source = ["."]
 relative_files = true
 branch = true
-omit = [".venv/*", "*/migrations/*", "*/tests.py", "config/asgi.py", "config/wsgi.py"]
+omit = [".venv/*", "*/migrations/*", "*/tests/*", "config/asgi.py", "config/wsgi.py"]
 
 [tool.coverage.xml]
 output = "coverage.xml"
