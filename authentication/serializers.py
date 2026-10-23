@@ -1,5 +1,7 @@
 from django.contrib.auth import get_user_model
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer, TokenVerifySerializer
+from rest_framework.exceptions import AuthenticationFailed
+from rest_framework_simplejwt.tokens import UntypedToken
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
@@ -9,6 +11,26 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.settings import api_settings
 
 User = get_user_model()
+
+
+def require_active_token_user(token):
+    if not User.objects.filter(pk=token.get(api_settings.USER_ID_CLAIM), is_active=True).exists():
+        raise AuthenticationFailed('Compte indisponible.')
+
+
+class ActiveUserTokenRefreshSerializer(TokenRefreshSerializer):
+    def validate(self, attrs):
+        require_active_token_user(RefreshToken(attrs['refresh']))
+        try:
+            return super().validate(attrs)
+        except User.DoesNotExist as exc:
+            raise AuthenticationFailed('Compte indisponible.') from exc
+
+
+class ActiveUserTokenVerifySerializer(TokenVerifySerializer):
+    def validate(self, attrs):
+        require_active_token_user(UntypedToken(attrs['token']))
+        return super().validate(attrs)
 
 
 class LogoutSerializer(serializers.Serializer):
