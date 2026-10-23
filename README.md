@@ -55,8 +55,12 @@ openssl genrsa -out private.pem 2048
 openssl rsa -in private.pem -pubout -out public.pem
 ```
 
-Coller le contenu de chaque fichier dans `.env`, avec des `\n` littéraux à la
-place des retours à la ligne (voir `.env.example`). Distribuer `public.pem`
+En local, garder les deux fichiers à la racine du projet (ignorés par Git) et
+les référencer dans `.env` avec `JWT_PRIVATE_KEY_FILE=private.pem` et
+`JWT_PUBLIC_KEY_FILE=public.pem`. Là où monter un fichier n'est pas pratique
+(CI, Kubernetes…), passer plutôt le contenu dans `JWT_PRIVATE_KEY` /
+`JWT_PUBLIC_KEY`, avec des `\n` littéraux à la place des retours à la ligne ;
+`*_FILE` est prioritaire si les deux sont définis. Distribuer `public.pem`
 aux services consommateurs, garder `private.pem` uniquement ici. En cas de
 compromission d'un service consommateur, seule la clé publique fuite —
 aucun risque de forger de nouveaux tokens.

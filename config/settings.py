@@ -144,8 +144,16 @@ STATIC_URL = 'static/'
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-PRIVATE_KEY = os.getenv("JWT_PRIVATE_KEY", "").replace("\\n", "\n")
-PUBLIC_KEY = os.getenv("JWT_PUBLIC_KEY", "").replace("\\n", "\n")
+def read_key(name):
+    # NAME_FILE points to a PEM file (relative to BASE_DIR); otherwise NAME holds the key with literal \n.
+    path = os.getenv(f"{name}_FILE")
+    if path:
+        return (BASE_DIR / path).read_text()
+    return os.getenv(name, "").replace("\\n", "\n")
+
+
+PRIVATE_KEY = read_key("JWT_PRIVATE_KEY")
+PUBLIC_KEY = read_key("JWT_PUBLIC_KEY")
 
 # Django REST Framework
 # https://www.django-rest-framework.org/api-guide/settings/

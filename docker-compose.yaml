@@ -38,8 +38,11 @@ services:
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1}
       - DB_HOST=db
       - DB_PORT=5432
-      - JWT_PRIVATE_KEY=${JWT_PRIVATE_KEY}
-      - JWT_PUBLIC_KEY=${JWT_PUBLIC_KEY}
+      - JWT_PRIVATE_KEY=${JWT_PRIVATE_KEY:-}
+      - JWT_PUBLIC_KEY=${JWT_PUBLIC_KEY:-}
+      # Chemins relatifs à /app, où le dossier du projet est monté.
+      - JWT_PRIVATE_KEY_FILE=${JWT_PRIVATE_KEY_FILE:-}
+      - JWT_PUBLIC_KEY_FILE=${JWT_PUBLIC_KEY_FILE:-}
       - PASSWORD_RESET_URL=${PASSWORD_RESET_URL:-http://localhost:3000/reset-password}
       - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL:-no-reply@localhost}
     depends_on:
