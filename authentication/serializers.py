@@ -1,3 +1,5 @@
+import logging
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.encoding import force_str
@@ -15,6 +17,9 @@ from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, Ou
 from .emails import send_password_reset_email
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
+
+INVALID_RESET_LINK = 'Lien de réinitialisation invalide ou expiré.'
 
 
 class PasswordResetRequestSerializer(serializers.Serializer):
@@ -25,7 +30,10 @@ class PasswordResetRequestSerializer(serializers.Serializer):
         user = User.objects.filter(email__iexact=self.validated_data['email'].strip(), is_active=True).first()
         if user is None or not user.has_usable_password():
             return
-        send_password_reset_email(user)
+        try:
+            send_password_reset_email(user)
+        except OSError:  # smtplib errors and connection failures
+            logger.exception('Password reset email could not be sent (user %s)', user.pk)
 
 
 class PasswordResetConfirmSerializer(serializers.Serializer):
@@ -39,7 +47,7 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         except (TypeError, ValueError, OverflowError, ValidationError, User.DoesNotExist):
             user = None
         if user is None or not default_token_generator.check_token(user, attrs['token']):
-            raise serializers.ValidationError({'token': 'Lien de réinitialisation invalide ou expiré.'})
+            raise serializers.ValidationError({'token': INVALID_RESET_LINK})
         try:
             validate_password(attrs['new_password'], user)
         except ValidationError as exc:
@@ -48,8 +56,10 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         return attrs
 
     def save(self, **kwargs):
-        user = self.validated_data['user']
         with transaction.atomic():
+            user = User.objects.select_for_update().get(pk=self.validated_data['user'].pk)
+            if not default_token_generator.check_token(user, self.validated_data['token']):
+                raise serializers.ValidationError({'token': INVALID_RESET_LINK})
             user.set_password(self.validated_data['new_password'])
             user.save(update_fields=['password'])
             # Revoke every open session: whoever knew the old password must not stay logged in.

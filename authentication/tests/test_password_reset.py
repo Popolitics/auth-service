@@ -7,8 +7,11 @@ from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.core import mail
 from django.test import override_settings
 from django.urls import reverse
+from rest_framework.exceptions import ValidationError
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
+
+from authentication.serializers import PasswordResetConfirmSerializer
 
 from .helpers import RS256BackendMixin
 
@@ -51,6 +54,14 @@ class PasswordResetTests(RS256BackendMixin, APITestCase):
                 self.assertEqual(response.data, known.data)
         self.assertEqual(mail.outbox, [])
 
+    def test_request_hides_email_sending_failure(self):
+        known = self.request_reset()
+        with patch('authentication.serializers.send_password_reset_email', side_effect=ConnectionRefusedError), \
+                self.assertLogs('authentication.serializers', 'ERROR'):
+            response = self.request_reset()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, known.data)
+
     def test_request_requires_valid_email(self):
         for data in [{}, {'email': 'invalid'}]:
             with self.subTest(data=data):
@@ -69,6 +80,19 @@ class PasswordResetTests(RS256BackendMixin, APITestCase):
         response = self.confirm(params, 'Third!Password915')
         self.assertEqual(response.status_code, 400)
         self.assertIn('token', response.data)
+
+    def test_concurrent_confirmations_with_same_link(self):
+        params = self.reset_params()
+        first = PasswordResetConfirmSerializer(data={**params, 'new_password': self.new_password})
+        second = PasswordResetConfirmSerializer(data={**params, 'new_password': 'Third!Password915'})
+        # Both validated before either saves, as with two simultaneous requests.
+        self.assertTrue(first.is_valid())
+        self.assertTrue(second.is_valid())
+        first.save()
+        with self.assertRaises(ValidationError):
+            second.save()
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(self.new_password))
 
     def test_link_expires_after_one_hour(self):
         params = self.reset_params()
