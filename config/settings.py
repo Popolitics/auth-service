@@ -222,6 +222,12 @@ MAILERS = {
         'BACKEND': 'django.core.mail.backends.console.EmailBackend',
     },
 }
+DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='no-reply@localhost')
+
+# Password reset
+# Frontend page receiving ?uid=…&token=…, which then calls /api/password-reset/confirm/.
+PASSWORD_RESET_URL = env('PASSWORD_RESET_URL', default='http://localhost:3000/reset-password')
+PASSWORD_RESET_TIMEOUT = 60 * 60  # 1 heure
 
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STORAGES = {

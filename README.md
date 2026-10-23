@@ -35,6 +35,11 @@ La CI exécute les migrations et les tests sur PostgreSQL 16, puis transmet la c
 | `/api/login/` | POST | Login → `{access, refresh}` |
 | `/api/logout/` | POST | Révoque le refresh token fourni dans `{"refresh": "…"}` ; access token Bearer requis |
 | `/api/token/refresh/` | POST | Renouvelle un `access` à partir d'un `refresh` |
+| `/api/password-reset/` | POST | `{"email": "…"}` → envoie un lien de réinitialisation (réponse `200` identique que le compte existe ou non) |
+| `/api/password-reset/confirm/` | POST | `{"uid", "token", "new_password"}` → `204`, change le mot de passe et révoque les refresh tokens |
+
+Le lien de réinitialisation pointe vers `PASSWORD_RESET_URL?uid=…&token=…` (page frontend) ; il expire après 1 heure
+et ne sert qu'une fois.
 
 L'inscription demande un email et un mot de passe ; `username` est facultatif.
 Après logout (`204`), supprimer les tokens côté client ; l'access token reste valide jusqu'à expiration (15 minutes maximum).
