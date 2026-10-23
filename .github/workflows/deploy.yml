@@ -1,4 +1,4 @@
-name: Build and Push to GHCR
+name: Build, Push to GHCR and Update GitOps
 
 on:
   push:
@@ -25,6 +25,8 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.image.outputs.name }}
     permissions:
       contents: read
       packages: write
@@ -56,3 +58,68 @@ jobs:
           push: ${{ github.event_name == 'push' }}
           tags: |
             ${{ steps.image.outputs.name }}:${{ github.sha }}
+
+  update-gitops:
+    needs: build
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: auth-service-infra-update
+      cancel-in-progress: false
+    env:
+      INFRA_BRANCH: feat/AUTH-1-init-argocd-integration-and-auth-service
+      DEPLOYMENT_PATH: k8s/base/auth_service/deployment.yaml
+      IMAGE_NAME: ${{ needs.build.outputs.image }}
+      IMAGE_TAG: ${{ github.sha }}
+    steps:
+      - name: Vérifier la configuration GitOps
+        env:
+          INFRA_REPO_TOKEN: ${{ secrets.INFRA_REPO_TOKEN }}
+        run: |
+          if [ -z "$INFRA_REPO_TOKEN" ]; then
+            echo "::error::Configurer INFRA_REPO_TOKEN avec Contents read/write sur Popolitics/infra."
+            exit 1
+          fi
+
+      - name: Checkout du dépôt infra
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: Popolitics/infra
+          ref: ${{ env.INFRA_BRANCH }}
+          token: ${{ secrets.INFRA_REPO_TOKEN }}
+
+      - name: Installer Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.13'
+
+      - name: Mettre à jour le tag de l'image auth-service
+        shell: python
+        run: |
+          import os
+          import re
+          from pathlib import Path
+
+          path = Path(os.environ['DEPLOYMENT_PATH'])
+          image = os.environ['IMAGE_NAME']
+          tag = os.environ['IMAGE_TAG']
+          if image != 'ghcr.io/popolitics/auth-service' or not re.fullmatch(r'[0-9a-f]{40}', tag):
+              raise SystemExit('Nom ou tag de l’image inattendu.')
+          content = path.read_text(encoding='utf-8')
+          pattern = re.compile(r'^(\s*image:\s*)' + re.escape(image) + r'(?::[^\s#]+|@sha256:[0-9a-f]+)?([ \t]*(?:#.*)?)$', re.MULTILINE)
+          updated, count = pattern.subn(lambda match: match[1] + image + ':' + tag + match[2], content)
+          if count != 1:
+              raise SystemExit(f'Une seule image auth-service attendue, trouvé : {count}.')
+          path.write_text(updated, encoding='utf-8')
+
+      - name: Commit et push du manifeste
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- "$DEPLOYMENT_PATH"
+          if git diff --cached --quiet; then
+            echo "Le manifeste référence déjà cette image."
+            exit 0
+          fi
+          git commit -m "ci(auth): update image to ${IMAGE_TAG}"
+          git push origin "HEAD:${INFRA_BRANCH}"
