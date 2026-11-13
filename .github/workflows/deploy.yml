@@ -1,3 +1,4 @@
+
 name: Build, Push to GHCR and Update GitOps
 
 on:
@@ -27,6 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       image: ${{ steps.image.outputs.name }}
+
     permissions:
       contents: read
       packages: write
@@ -51,7 +53,7 @@ jobs:
         shell: bash
         run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
 
-      - name: Build de l'image et publication sur les push
+      - name: Build et publication de l'image
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           context: .
@@ -63,21 +65,23 @@ jobs:
     needs: build
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
+
     concurrency:
-      group: auth-service-infra-update
+      group: auth-service-infra-${{ github.ref_name }}
       cancel-in-progress: false
+
     env:
-      INFRA_BRANCH: feat/AUTH-1-init-argocd-integration-and-auth-service
-      DEPLOYMENT_PATH: k8s/base/auth_service/deployment.yaml
+      INFRA_BRANCH: ${{ github.ref_name }}
       IMAGE_NAME: ${{ needs.build.outputs.image }}
       IMAGE_TAG: ${{ github.sha }}
+
     steps:
-      - name: Vérifier la configuration GitOps
+      - name: Vérifier le token GitOps
         env:
           INFRA_REPO_TOKEN: ${{ secrets.INFRA_REPO_TOKEN }}
         run: |
           if [ -z "$INFRA_REPO_TOKEN" ]; then
-            echo "::error::Configurer INFRA_REPO_TOKEN avec Contents read/write sur Popolitics/infra."
+            echo "::error::INFRA_REPO_TOKEN manquant"
             exit 1
           fi
 
@@ -93,33 +97,69 @@ jobs:
         with:
           python-version: '3.13'
 
-      - name: Mettre à jour le tag de l'image auth-service
+      - name: Mettre à jour le tag de l'overlay
         shell: python
         run: |
           import os
           import re
           from pathlib import Path
 
-          path = Path(os.environ['DEPLOYMENT_PATH'])
-          image = os.environ['IMAGE_NAME']
-          tag = os.environ['IMAGE_TAG']
-          if image != 'ghcr.io/popolitics/auth-service' or not re.fullmatch(r'[0-9a-f]{40}', tag):
-              raise SystemExit('Nom ou tag de l’image inattendu.')
-          content = path.read_text(encoding='utf-8')
-          pattern = re.compile(r'^(\s*image:\s*)' + re.escape(image) + r'(?::[^\s#]+|@sha256:[0-9a-f]+)?([ \t]*(?:#.*)?)$', re.MULTILINE)
-          updated, count = pattern.subn(lambda match: match[1] + image + ':' + tag + match[2], content)
-          if count != 1:
-              raise SystemExit(f'Une seule image auth-service attendue, trouvé : {count}.')
-          path.write_text(updated, encoding='utf-8')
+          branch = os.environ["INFRA_BRANCH"]
+          environment = "prod" if branch == "main" else "dev"
 
-      - name: Commit et push du manifeste
+          path = Path(
+              f"k8s/overlays/{environment}/auth_service/kustomization.yaml"
+          )
+
+          image = os.environ["IMAGE_NAME"]
+          tag = os.environ["IMAGE_TAG"]
+
+          if image != "ghcr.io/popolitics/auth-service":
+              raise SystemExit("Nom d'image inattendu")
+
+          if not re.fullmatch(r"[0-9a-f]{40}", tag):
+              raise SystemExit("Tag SHA invalide")
+
+          if not path.is_file():
+              raise SystemExit(f"Fichier introuvable : {path}")
+
+          content = path.read_text(encoding="utf-8")
+
+          pattern = re.compile(
+              r"(^[ \t]*newTag:[ \t]*)(['\"]?)[^'\"\s#]+(['\"]?)",
+              re.MULTILINE,
+          )
+
+          updated, count = pattern.subn(
+              lambda m: m.group(1) + '"' + tag + '"',
+              content,
+          )
+
+          if count != 1:
+              raise SystemExit(
+                  f"Un seul newTag attendu, trouvé : {count}"
+              )
+
+          path.write_text(updated, encoding="utf-8")
+          print(f"Image {image}:{tag} -> {path}")
+
+      - name: Commit et push GitOps
+        shell: bash
         run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- "$DEPLOYMENT_PATH"
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add k8s/overlays/
+
           if git diff --cached --quiet; then
-            echo "Le manifeste référence déjà cette image."
+            echo "Aucun changement."
             exit 0
           fi
-          git commit -m "ci(auth): update image to ${IMAGE_TAG}"
+
+          git commit -m \
+            "ci(auth): update ${INFRA_BRANCH} image to ${IMAGE_TAG}"
+
           git push origin "HEAD:${INFRA_BRANCH}"
